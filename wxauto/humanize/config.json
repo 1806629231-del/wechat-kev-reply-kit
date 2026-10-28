@@ -1,0 +1,20 @@
+{
+  "SEND_ENABLED": false,
+  "min_gap_s": 12,
+  "gap_jitter_s": [
+    0,
+    6
+  ],
+  "per_chat_gap_s": 40,
+  "per_group_daily": 20,
+  "total_daily": 60,
+  "quiet_start": 23,
+  "quiet_end": 8,
+  "group_max_chars": 200,
+  "max_sentences": 2,
+  "mention_jitter_s": [
+    2,
+    6
+  ],
+  "kill_file": "/workspace/wxauto/humanize/KILL"
+}
