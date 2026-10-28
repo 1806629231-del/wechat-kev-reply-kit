@@ -40,10 +40,14 @@
 
 **第 3 步 基本信息**：依次问（一次一个）：小号有没有、养了多久 → 国内出口用哪台设备（常开的 Windows 电脑 / 备用安卓手机）→ 有没有 Tailscale 账号（没有就教他注册，box 和出口设备登同一个账号）。
 
-**第 4 步 国内出口**：按 `proxy/README.md`。
+**第 4 步 国内出口**：按 `proxy/README.md`。**安卓出口的保活必须在这一步一次配完，不要留到后面出故障再补。**
 - Windows 电脑：`ListMachines` → 已连上就带 machineId 远程测出口 `curl.exe -s myip.ipip.net`（必须国内运营商），管理员跑 `proxy/install-gost-windows.ps1`（不传密码，自动生成），自己读回 Tailscale IP、SOCKS 用户名密码，写进 box 的 `~/secrets/phone-socks.env`（chmod 600）。
-- 安卓手机或主人不愿连：手机装 Tailscale + hev socks5（只监听 Tailscale 100.x 地址的 1080、设用户名密码、关电池优化、允许自启动/后台、在多任务里锁住）；用户名密码用密钥输入框收。
-- 出口不是国内 → 换设备或改路由，别硬上。
+- 安卓手机或主人不愿连电脑：装 Tailscale + hev socks5（https://github.com/heiher/socks5/releases）。配置清单（逐项勾完才能进第 5 步）：
+  1. Listen Address = 手机 Tailscale IP（100.x），Listen Port = 1080；**「Listen IPv6 only」必须关掉**（勾上会导致 IPv4 的 1080 拒绝连接，界面却仍显示 Stop）。
+  2. 用户名+密码认证（随机 ≥16 位）；用密钥输入框收，写进 `~/secrets/phone-socks.env`。
+  3. 点 Start，按钮变成 Stop；在 box 上立刻测 `timeout 3 bash -c 'echo >/dev/tcp/<PHONE_TS_IP>/1080'` 必须通，再 `curl --socks5-hostname … https://myip.ipip.net` 必须是国内运营商。
+  4. **保活（默认就开，配置阶段做完）**：多任务里下拉卡片锁住 Tailscale 和 Socks5；设置→应用→应用启动管理→两者都改「手动管理」，自启动/关联启动/后台活动全开；电池→不优化。重启后提醒主人再开一次 Socks5（HarmonyOS 不会真正常驻 VPN）。
+- 出口不是国内 → 换设备或改路由，别硬上。代理没通之前禁止装/开/扫码微信。
 
 **第 5 步 box 侧检查**：`bash install-all.sh`（首次会生成 secrets 模板并退出，填好后重跑）。它装 Tailscale、proxychains（strict_chain，代理断了直接断网不回落海外）、ts-watchdog、固定 `WX_DISPLAY`。第一次 Tailscale 登录给主人链接点一下授权。必须看到 `SOCKS exit is in mainland China`。
 

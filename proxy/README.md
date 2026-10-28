@@ -14,12 +14,19 @@ Foreign IP ⇒ a VPN app or a side router tunnels it abroad ⇒ choose another d
 side router). Keep the device in ONE place on ONE network forever (moving changes the exit IP).
 
 ## Option A – spare Android phone (used, working)
-1. Tailscale installed, logged into the tailnet, kept alive (lock in Recents; app launch manual; no battery optimization).
+Keep-alive is part of **first-time setup**, not a later fix. Do not continue to the box WeChat until every item below is done.
+1. Tailscale installed, logged into the same tailnet as the box, locked in Recents; App launch = Manage manually
+   (auto-start / associated / background ON); battery = no optimization.
 2. Install **hev socks5** (open source, MIT): APK from https://github.com/heiher/socks5/releases . Honor/Huawei may ask
    for the Huawei ID password – the owner enters it (or supplies it in a chmod-600 file on the box; type once, never log).
-3. Configure: listen address = the phone's **Tailscale IP** (`<PHONE_TS_IP>`), port 1080, auth username/password
-   (random, ≥16 chars), start on boot ON, battery optimization OFF, app launch manual (auto/associated/background ON).
-4. Confirm the LAN IP and 127.0.0.1 are NOT listening; only the 100.x address.
+3. Configure Socks5:
+   - Listen Address = phone **Tailscale IP** (`<PHONE_TS_IP>`), Listen Port = 1080
+   - **Listen IPv6 only = OFF** (if ON, IPv4 :1080 refuses while the UI still shows Stop)
+   - Auth username/password (random, ≥16 chars)
+   - Same keep-alive as Tailscale: lock in Recents; app launch manual (all three ON); battery no optimization
+4. Tap Start (button becomes Stop). From the box: TCP `<PHONE_TS_IP>:1080` must accept, and
+   `curl --socks5-hostname USER:PASS@<PHONE_TS_IP>:1080 https://myip.ipip.net` must be a mainland ISP.
+   Confirm LAN IP and 127.0.0.1 are NOT the listen address — only the 100.x address.
 
 ## 方案 B – Windows 电脑（备用）：优先由 Bot 远程完成
 1. Bot 先调 `ListMachines`，看这台 Windows 电脑有没有连到 Grok Bot。
