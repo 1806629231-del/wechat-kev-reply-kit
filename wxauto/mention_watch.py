@@ -223,7 +223,7 @@ def llm(chat,sender,text,private=False,context=""):
     sysmsg=("【场景】微信群里，有人 @ 你（昵称「{BOT_NICK}」）。用中文回，直接给最终回复，不要思考过程。"
             "字数尽量 ≤60；不确定的事实别编，可以说回头查。"
             "\n\n"+PERSONA+"\n\n"
-            "别人要表情包/{STICKER_TOPIC}/发图：口头接一下即可，绝不要说发不了图。")
+            "别人发图或要图：口头接一句即可，不发图片。")
     if private:
         _owner_dm = any(k in (chat or "") for k in ("{OWNER_NICK}","{OWNER_NICK}","{OWNER_NICK}"))
         if _owner_dm:
@@ -231,15 +231,15 @@ def llm(chat,sender,text,private=False,context=""):
                     "对他直接说话，别用第三人称提他，更不要说「去问{OWNER_NICK}」。不泄露密钥路径隐私。"
                     "\n\n"+PERSONA+"\n\n"
                     "文件/链接：随口认一下就行，别每条都问要不要帮忙；他让你做再做。"
-                    "图片/表情当斗图接一句即可，系统会再贴；别说看不到图。")
+                    "图片/表情当斗图口头接一句即可；别说看不到图。")
         else:
             sysmsg=("【场景】微信私聊（对方是{OWNER_NICK}的联系人，不是他本人）。用中文回，直接给最终回复，不要思考过程。"
                     "字数尽量 ≤50。"
                     "你只代表自己说话：不知道{OWNER_NICK}此刻在哪/忙不忙，禁止说他不在/在忙/过会儿回；"
                     "禁止承诺转告或替他安排；不确定就让对方直接问{OWNER_NICK}；不泄露密钥路径隐私。"
                     "\n\n"+PERSONA+"\n\n"
-                    "若对方发来图片/表情（消息含[图片]/[动画表情]/[图片/表情包]或几乎无字）：当斗图接一句即可，"
-                    "系统会再贴表情；绝不要说看不到图。")
+                    "若对方发来图片/表情（消息含[图片]/[动画表情]/[图片/表情包]或几乎无字）：当斗图口头接一句即可，"
+                    "绝不要说看不到图。")
     umsg=(f"私聊对象：{chat}\n对方最新消息：{text}" if private else f"群：{chat}\n{sender} @你说：{text}\n请针对这条@消息、结合上下文回复。")
     sysmsg+=TASK_RULE
     if context:
@@ -292,93 +292,13 @@ def llm(chat,sender,text,private=False,context=""):
                 time.sleep(0.5*(attempt+1)); continue
             raise
     raise last
-CAT=json.load(open(f"{D}/stickers/catalog.json"))
 sys.path.insert(0,"/workspace/kev"); import decide
-STICKER_ASK_RE=re.compile(r"\[图片|\[动画表情|\[Sticker|\[Photo|表情包|{STICKER_TOPIC}|发图|发个图|发张图|贴纸|sticker|gpt娘|deepseek|{STICKER_TOPIC}", re.I)
-TOPIC_KEYS=(
-    ("{STICKER_TOPIC}",("{STICKER_TOPIC}","deepseek","{STICKER_TOPIC}","ds")),
-    ("gpt",("gpt娘","gpt","chatgpt")),
-    ("claude",("claude","克劳德")),
-)
-def _wants_sticker(text):
-    return bool(STICKER_ASK_RE.search(text or ""))
-def _topic_needles(text):
-    t=(text or "").lower()
-    needles=[]
-    for _,keys in TOPIC_KEYS:
-        if any(k.lower() in t for k in keys):
-            needles.extend(keys)
-    return needles
-def _sticker_pool(limit=12, prefer_needles=None):
-    """Diverse ≤limit stickers; prefer those whose desc/id match topic needles."""
-    prefer_needles=[n.lower() for n in (prefer_needles or [])]
-    preferred=[]
-    if prefer_needles:
-        for c in CAT:
-            blob=(c.get("desc","")+c.get("id","")+c.get("category","")).lower()
-            if any(n in blob for n in prefer_needles):
-                preferred.append(c)
-    by={}
-    for c in CAT: by.setdefault(c["category"], []).append(c)
-    cats=list(by.keys()); random.shuffle(cats)
-    picks=[]; seen=set()
-    # fill from preferred first (shuffle), then diverse categories
-    pref=preferred[:]; random.shuffle(pref)
-    for c in pref:
-        if c["id"] in seen: continue
-        picks.append(c); seen.add(c["id"])
-        if len(picks)>=limit: return picks
-    for cat in cats:
-        items=by[cat][:]; random.shuffle(items)
-        for c in items:
-            if c["id"] in seen: continue
-            picks.append(c); seen.add(c["id"]); break
-        if len(picks)>=limit: return picks
-    rest=[c for c in CAT if c["id"] not in seen]; random.shuffle(rest)
-    for c in rest:
-        picks.append(c)
-        if len(picks)>=limit: break
-    return picks
 def maybe_sticker(chat,text,reply,dry):
-    t0=time.perf_counter()
-    try:
-        force=_wants_sticker(text)
-        needles=_topic_needles(text)
-        st=f"群聊消息：{text}\n我的文字回复：{reply}"
-        p=1.0; t_noul=t0
-        if not force:
-            k=decide.noul(st,"Would a cute meme sticker after this reply fit (anything except very serious or sad topics)?")
-            p=k["answers"]["q"]["noul"]; t_noul=time.perf_counter()
-            if p<0.25:
-                return {"sticker":None,"noul":p,"force":False,"decide_ms":round((t_noul-t0)*1000),"send_image_ms":0}
-        else:
-            t_noul=time.perf_counter()
-        # meaning-matched pick (sticker_pick.py): DeepSeek picks from top-8, hostile never, NONE allowed
-        import sticker_pick as SP
-        sel,pinfo=SP.pick(reply,text,k=8,forced=bool(force or needles))
-        t_dec=time.perf_counter()
-        if not sel:
-            return {"sticker":None,"noul":p,"force":force,"pick":pinfo,"decide_ms":round((t_dec-t0)*1000),"send_image_ms":0}
-        path=sel["path"]; sid=sel["id"]
-        t_send0=time.perf_counter()
-        ok,lg=SND.send_image(chat,path,dry=dry,eng=eng,already_open=True,fast=True)
-        t_send1=time.perf_counter()
-        return {"sticker":sid,"noul":p,"force":force,"ok":ok,"out":str(lg)[-200:],
-                "decide_ms":round((t_dec-t0)*1000),"send_image_ms":round((t_send1-t_send0)*1000),
-                "noul_ms":round((t_noul-t0)*1000),"choice_ms":round((t_dec-t_noul)*1000)}
-    except Exception as e:
-        return {"sticker_err":str(e)[-200:],"decide_ms":round((time.perf_counter()-t0)*1000)}
-import harvest as HV
+    """Stickers removed from this kit: never sends an image."""
+    return {}
 def _harvest_pane(X,Y,W,H,tag=""):
-    """Grab chat pane, save new left-side stickers to pending. Returns (new_count, n_images_seen)."""
-    try:
-        with mss.MSS() as s: im=np.array(s.grab({"left":X+320,"top":Y+85,"width":W-330,"height":435}))[:,:,:3]
-        rgb=np.ascontiguousarray(im[:,:,::-1])
-        seen=len(HV.find_images(rgb)); n=HV.harvest(rgb,tag)
-        if n: jlog("mention_log.jsonl",{"event":"stickers_harvested","n":n,"chat":tag})
-        return n,seen
-    except Exception as e:
-        jlog("mention_log.jsonl",{"event":"harvest_err","err":str(e)[-200:]}); return 0,0
+    """Sticker harvesting removed. Kept as a no-op for callers; returns (0, 0)."""
+    return 0,0
 def _click_chat_row(wid,X,Y,name):
     sp.run(["xdotool","windowactivate","--sync",wid])
     sp.run(["xdotool","mousemove","--sync",str(X+name[0]+40),str(Y+name[1]+8),"click","1"])
